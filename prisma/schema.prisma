@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  ownedWorkspaces   Workspace[]
+  workspaceMembers  WorkspaceMember[]
+  cardMembers       CardMember[]
+  comments          Comment[]
+  attachments       Attachment[]
+  apiKeys           ApiKey[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner   User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  boards  Board[]
+  members WorkspaceMember[]
+  apiKeys ApiKey[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  workspaceId String          @map("workspace_id")
+  userId      String          @map("user_id")
+  role        WorkspaceRole   @default(MEMBER)
+  joinedAt    DateTime        @default(now()) @map("joined_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  ADMIN
+  MEMBER
+}
+
+model Board {
+  id            String          @id @default(cuid())
+  workspaceId   String          @map("workspace_id")
+  title         String
+  backgroundUrl String?         @map("background_url")
+  visibility    BoardVisibility @default(WORKSPACE)
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lists     List[]
+  labels    Label[]
+
+  @@map("boards")
+}
+
+enum BoardVisibility {
+  PRIVATE
+  WORKSPACE
+  PUBLIC
+}
+
+model List {
+  id        String   @id @default(cuid())
+  boardId   String   @map("board_id")
+  title     String
+  position  Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@map("lists")
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  listId      String    @map("list_id")
+  title       String
+  description String?
+  position    Float
+  dueDate     DateTime? @map("due_date")
+  coverColor  String?   @map("cover_color")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  list        List         @relation(fields: [listId], references: [id], onDelete: Cascade)
+  members     CardMember[]
+  labels      CardLabel[]
+  checklists  Checklist[]
+  comments    Comment[]
+  attachments Attachment[]
+
+  @@map("cards")
+}
+
+model CardMember {
+  cardId String @map("card_id")
+  userId String @map("user_id")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@map("card_members")
+}
+
+model Label {
+  id      String @id @default(cuid())
+  boardId String @map("board_id")
+  name    String
+  color   String
+
+  board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards CardLabel[]
+
+  @@map("labels")
+}
+
+model CardLabel {
+  cardId  String @map("card_id")
+  labelId String @map("label_id")
+
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@map("card_labels")
+}
+
+model Checklist {
+  id     String @id @default(cuid())
+  cardId String @map("card_id")
+  title  String
+
+  card  Card            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String  @id @default(cuid())
+  checklistId String  @map("checklist_id")
+  text        String
+  isDone      Boolean @default(false) @map("is_done")
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@map("checklist_items")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String   @map("card_id")
+  userId    String   @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  cardId    String   @map("card_id")
+  userId    String   @map("user_id")
+  filename  String
+  minioKey  String   @map("minio_key")
+  size      Int
+  mimeType  String   @map("mime_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  userId      String   @map("user_id")
+  key         String   @unique
+  name        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
