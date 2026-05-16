@@ -59,7 +59,7 @@ async function bootstrap() {
   await app.register(labelRoutes)
   await app.register(webhookRoutes)
 
-  app.get('/health', async () => ({
+  app.get('/api/health', async () => ({
     status: 'ok',
     db: 'connected',
     redis: app.redis.status === 'ready' ? 'connected' : 'error',
