@@ -21,7 +21,10 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     const userId = (req.user as { sub: string }).sub
     return app.db.workspace.findMany({
       where: { members: { some: { userId } } },
-      include: { _count: { select: { boards: true, members: true } } },
+      include: {
+        boards: { orderBy: { createdAt: 'desc' } },
+        _count: { select: { boards: true, members: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
   })
