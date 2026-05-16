@@ -46,6 +46,24 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     return reply.code(201).send(workspace)
   })
 
+  app.put('/workspaces/:id', {
+    ...auth,
+    schema: {
+      tags: ['Workspaces'],
+      summary: 'Rename workspace (Admin only)',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body)
+    const userId = (req.user as { sub: string }).sub
+    const member = await app.db.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: id, userId } } })
+    if (!member || member.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin only' })
+    const workspace = await app.db.workspace.update({ where: { id }, data: { name } })
+    return workspace
+  })
+
   app.get('/workspaces/:id', {
     ...auth,
     schema: {
