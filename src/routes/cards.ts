@@ -202,6 +202,19 @@ export default async function cardRoutes(app: FastifyInstance) {
     return app.db.checklistItem.update({ where: { id }, data: { isDone, text } })
   })
 
+  app.delete('/checklists/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Delete checklist',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    await app.db.checklist.delete({ where: { id } })
+    return reply.code(204).send()
+  })
+
   app.delete('/checklist-items/:id', {
     ...auth,
     schema: {
