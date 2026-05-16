@@ -1,12 +1,22 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
-import { pipeline } from 'stream/promises'
 
 export default async function cardRoutes(app: FastifyInstance) {
   const auth = { onRequest: [app.authenticate] }
 
-  app.post('/api/cards', auth, async (req, reply) => {
+  app.post('/cards', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Create card',
+      body: {
+        type: 'object',
+        required: ['listId', 'title'],
+        properties: { listId: { type: 'string' }, title: { type: 'string' } },
+      },
+    },
+  }, async (req, reply) => {
     const body = z.object({ listId: z.string(), title: z.string().min(1) }).parse(req.body)
     const last = await app.db.card.findFirst({ where: { listId: body.listId }, orderBy: { position: 'desc' } })
     const card = await app.db.card.create({ data: { ...body, position: (last?.position ?? 0) + 1.0 } })
@@ -15,7 +25,23 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(201).send(card)
   })
 
-  app.put('/api/cards/:id', auth, async (req) => {
+  app.put('/cards/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Update card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          dueDate: { type: 'string', nullable: true },
+          coverColor: { type: 'string', nullable: true },
+        },
+      },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const body = z.object({
       title: z.string().min(1).optional(),
@@ -29,7 +55,19 @@ export default async function cardRoutes(app: FastifyInstance) {
     return card
   })
 
-  app.put('/api/cards/:id/move', auth, async (req) => {
+  app.put('/cards/:id/move', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Move card to another list',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['listId', 'position'],
+        properties: { listId: { type: 'string' }, position: { type: 'number' } },
+      },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const body = z.object({ listId: z.string(), position: z.number() }).parse(req.body)
     const card = await app.db.card.update({ where: { id }, data: body })
@@ -38,7 +76,14 @@ export default async function cardRoutes(app: FastifyInstance) {
     return card
   })
 
-  app.delete('/api/cards/:id', auth, async (req, reply) => {
+  app.delete('/cards/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Delete card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const card = await app.db.card.delete({ where: { id } })
     const list = await app.db.list.findUniqueOrThrow({ where: { id: card.listId } })
@@ -46,8 +91,15 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(204).send()
   })
 
-  // Members
-  app.post('/api/cards/:id/members', auth, async (req, reply) => {
+  app.post('/cards/:id/members', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Add member to card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['userId'], properties: { userId: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const { userId } = z.object({ userId: z.string() }).parse(req.body)
     await app.db.cardMember.upsert({
@@ -58,14 +110,28 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(204).send()
   })
 
-  app.delete('/api/cards/:id/members/:userId', auth, async (req, reply) => {
+  app.delete('/cards/:id/members/:userId', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Remove member from card',
+      params: { type: 'object', properties: { id: { type: 'string' }, userId: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id, userId } = req.params as { id: string; userId: string }
     await app.db.cardMember.delete({ where: { cardId_userId: { cardId: id, userId } } })
     return reply.code(204).send()
   })
 
-  // Labels
-  app.post('/api/cards/:id/labels', auth, async (req, reply) => {
+  app.post('/cards/:id/labels', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Add label to card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['labelId'], properties: { labelId: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const { labelId } = z.object({ labelId: z.string() }).parse(req.body)
     await app.db.cardLabel.upsert({
@@ -76,41 +142,87 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(204).send()
   })
 
-  app.delete('/api/cards/:id/labels/:labelId', auth, async (req, reply) => {
+  app.delete('/cards/:id/labels/:labelId', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Remove label from card',
+      params: { type: 'object', properties: { id: { type: 'string' }, labelId: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id, labelId } = req.params as { id: string; labelId: string }
     await app.db.cardLabel.delete({ where: { cardId_labelId: { cardId: id, labelId } } })
     return reply.code(204).send()
   })
 
-  // Checklists
-  app.post('/api/cards/:id/checklists', auth, async (req, reply) => {
+  app.post('/cards/:id/checklists', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Create checklist on card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const { title } = z.object({ title: z.string().min(1) }).parse(req.body)
     const checklist = await app.db.checklist.create({ data: { cardId: id, title } })
     return reply.code(201).send(checklist)
   })
 
-  app.post('/api/checklists/:id/items', auth, async (req, reply) => {
+  app.post('/checklists/:id/items', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Add item to checklist',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const { text } = z.object({ text: z.string().min(1) }).parse(req.body)
     const item = await app.db.checklistItem.create({ data: { checklistId: id, text } })
     return reply.code(201).send(item)
   })
 
-  app.put('/api/checklist-items/:id', auth, async (req) => {
+  app.put('/checklist-items/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Update checklist item',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: { isDone: { type: 'boolean' }, text: { type: 'string' } },
+      },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const { isDone, text } = z.object({ isDone: z.boolean().optional(), text: z.string().optional() }).parse(req.body)
     return app.db.checklistItem.update({ where: { id }, data: { isDone, text } })
   })
 
-  app.delete('/api/checklist-items/:id', auth, async (req, reply) => {
+  app.delete('/checklist-items/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Delete checklist item',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     await app.db.checklistItem.delete({ where: { id } })
     return reply.code(204).send()
   })
 
-  // Comments
-  app.get('/api/cards/:id/comments', auth, async (req) => {
+  app.get('/cards/:id/comments', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'List card comments',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     return app.db.comment.findMany({
       where: { cardId: id },
@@ -119,7 +231,15 @@ export default async function cardRoutes(app: FastifyInstance) {
     })
   })
 
-  app.post('/api/cards/:id/comments', auth, async (req, reply) => {
+  app.post('/cards/:id/comments', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Add comment to card',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['body'], properties: { body: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     const { body: text } = z.object({ body: z.string().min(1) }).parse(req.body)
@@ -130,8 +250,14 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(201).send(comment)
   })
 
-  // Attachments
-  app.post('/api/cards/:id/attachments', auth, async (req, reply) => {
+  app.post('/cards/:id/attachments', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Upload attachment to card (multipart/form-data)',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     const data = await req.file()
@@ -149,14 +275,28 @@ export default async function cardRoutes(app: FastifyInstance) {
     return reply.code(201).send(attachment)
   })
 
-  app.get('/api/attachments/:id/url', auth, async (req) => {
+  app.get('/attachments/:id/url', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Get presigned download URL for attachment',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const attachment = await app.db.attachment.findUniqueOrThrow({ where: { id } })
     const url = await app.minio.presignedGetObject('attachments', attachment.minioKey, 900)
     return { url, filename: attachment.filename, mimeType: attachment.mimeType }
   })
 
-  app.delete('/api/attachments/:id', auth, async (req, reply) => {
+  app.delete('/attachments/:id', {
+    ...auth,
+    schema: {
+      tags: ['Cards'],
+      summary: 'Delete attachment',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const attachment = await app.db.attachment.delete({ where: { id } })
     await app.minio.removeObject('attachments', attachment.minioKey)

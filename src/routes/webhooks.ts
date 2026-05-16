@@ -5,7 +5,15 @@ import { randomBytes } from 'crypto'
 export default async function webhookRoutes(app: FastifyInstance) {
   const auth = { onRequest: [app.authenticate] }
 
-  app.post('/api/workspaces/:id/api-keys', auth, async (req, reply) => {
+  app.post('/workspaces/:id/api-keys', {
+    ...auth,
+    schema: {
+      tags: ['Webhooks'],
+      summary: 'Create API key for workspace (Admin only)',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     const { name } = z.object({ name: z.string().min(1) }).parse(req.body)
@@ -19,18 +27,31 @@ export default async function webhookRoutes(app: FastifyInstance) {
     return reply.code(201).send(apiKey)
   })
 
-  app.delete('/api/api-keys/:id', auth, async (req, reply) => {
+  app.delete('/api-keys/:id', {
+    ...auth,
+    schema: {
+      tags: ['Webhooks'],
+      summary: 'Revoke API key',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     await app.db.apiKey.delete({ where: { id } })
     return reply.code(204).send()
   })
 
-  app.post('/api/webhooks/inbound', async (req, reply) => {
+  app.post('/webhooks/inbound', {
+    schema: {
+      tags: ['Webhooks'],
+      summary: 'Receive inbound webhook (x-api-key header)',
+      security: [],
+      body: { type: 'object' },
+    },
+  }, async (req, reply) => {
     const apiKey = req.headers['x-api-key'] as string
     if (!apiKey) return reply.code(401).send({ error: 'API key required' })
     const key = await app.db.apiKey.findUnique({ where: { key: apiKey } })
     if (!key) return reply.code(401).send({ error: 'Invalid API key' })
-    // Extend here: process inbound webhook payload
     return { received: true, workspaceId: key.workspaceId }
   })
 }

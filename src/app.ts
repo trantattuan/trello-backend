@@ -3,6 +3,8 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
+import swagger from '@fastify/swagger'
+import swaggerUi from '@fastify/swagger-ui'
 
 import dbPlugin from './plugins/db'
 import redisPlugin from './plugins/redis'
@@ -20,6 +22,34 @@ import webhookRoutes from './routes/webhooks'
 const app = Fastify({ logger: true })
 
 async function bootstrap() {
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'Trello Clone API', version: '1.0.0', description: 'Kanban board REST API' },
+      servers: [{ url: '/api', description: 'API base' }],
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+      tags: [
+        { name: 'Auth', description: 'Authentication' },
+        { name: 'Workspaces', description: 'Workspace management' },
+        { name: 'Boards', description: 'Board management' },
+        { name: 'Lists', description: 'List management' },
+        { name: 'Cards', description: 'Card management' },
+        { name: 'Labels', description: 'Label management' },
+        { name: 'Webhooks', description: 'API keys & webhooks' },
+      ],
+    },
+  })
+
+  await app.register(swaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: { docExpansion: 'list', deepLinking: true },
+    staticCSP: true,
+  })
+
   await app.register(cors, { origin: process.env.FRONTEND_URL, credentials: true })
   await app.register(jwt, { secret: process.env.JWT_SECRET! })
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } })
@@ -59,7 +89,7 @@ async function bootstrap() {
   await app.register(labelRoutes)
   await app.register(webhookRoutes)
 
-  app.get('/api/health', async () => ({
+  app.get('/health', async () => ({
     status: 'ok',
     db: 'connected',
     redis: app.redis.status === 'ready' ? 'connected' : 'error',

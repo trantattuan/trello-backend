@@ -13,7 +13,22 @@ async function assertMember(app: FastifyInstance, boardId: string, userId: strin
 export default async function boardRoutes(app: FastifyInstance) {
   const auth = { onRequest: [app.authenticate] }
 
-  app.post('/api/boards', auth, async (req, reply) => {
+  app.post('/boards', {
+    ...auth,
+    schema: {
+      tags: ['Boards'],
+      summary: 'Create board',
+      body: {
+        type: 'object',
+        required: ['workspaceId', 'title'],
+        properties: {
+          workspaceId: { type: 'string' },
+          title: { type: 'string' },
+          visibility: { type: 'string', enum: ['PRIVATE', 'WORKSPACE', 'PUBLIC'] },
+        },
+      },
+    },
+  }, async (req, reply) => {
     const body = z.object({
       workspaceId: z.string(),
       title: z.string().min(1),
@@ -28,7 +43,14 @@ export default async function boardRoutes(app: FastifyInstance) {
     return reply.code(201).send(board)
   })
 
-  app.get('/api/boards/:id', auth, async (req) => {
+  app.get('/boards/:id', {
+    ...auth,
+    schema: {
+      tags: ['Boards'],
+      summary: 'Get full board with lists and cards',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     await assertMember(app, id, userId)
@@ -54,7 +76,22 @@ export default async function boardRoutes(app: FastifyInstance) {
     })
   })
 
-  app.put('/api/boards/:id', auth, async (req) => {
+  app.put('/boards/:id', {
+    ...auth,
+    schema: {
+      tags: ['Boards'],
+      summary: 'Update board',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          visibility: { type: 'string', enum: ['PRIVATE', 'WORKSPACE', 'PUBLIC'] },
+          backgroundUrl: { type: 'string' },
+        },
+      },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     await assertMember(app, id, userId)
@@ -66,7 +103,14 @@ export default async function boardRoutes(app: FastifyInstance) {
     return app.db.board.update({ where: { id }, data: body })
   })
 
-  app.delete('/api/boards/:id', auth, async (req, reply) => {
+  app.delete('/boards/:id', {
+    ...auth,
+    schema: {
+      tags: ['Boards'],
+      summary: 'Delete board',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     await assertMember(app, id, userId)
@@ -74,16 +118,21 @@ export default async function boardRoutes(app: FastifyInstance) {
     return reply.code(204).send()
   })
 
-  app.get('/api/boards/:id/stats', auth, async (req) => {
+  app.get('/boards/:id/stats', {
+    ...auth,
+    schema: {
+      tags: ['Boards'],
+      summary: 'Board stats: card count by list / member / label',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     await assertMember(app, id, userId)
-
     const lists = await app.db.list.findMany({
       where: { boardId: id },
       include: { _count: { select: { cards: true } } },
     })
-
     const byMember = await app.db.$queryRaw<{ name: string; count: bigint }[]>`
       SELECT u.name, COUNT(cm.card_id)::int as count
       FROM card_members cm
@@ -93,7 +142,6 @@ export default async function boardRoutes(app: FastifyInstance) {
       WHERE l.board_id = ${id}
       GROUP BY u.name
     `
-
     const byLabel = await app.db.$queryRaw<{ name: string; color: string; count: bigint }[]>`
       SELECT lb.name, lb.color, COUNT(cl.card_id)::int as count
       FROM card_labels cl
@@ -101,7 +149,6 @@ export default async function boardRoutes(app: FastifyInstance) {
       WHERE lb.board_id = ${id}
       GROUP BY lb.id, lb.name, lb.color
     `
-
     return {
       byList: lists.map((l) => ({ id: l.id, title: l.title, count: l._count.cards })),
       byMember: byMember.map((r) => ({ name: r.name, count: Number(r.count) })),
