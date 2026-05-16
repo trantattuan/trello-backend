@@ -131,7 +131,7 @@ export default async function cardRoutes(app: FastifyInstance) {
   })
 
   // Attachments
-  app.post('/api/cards/:id/attachments', { ...auth, config: { rawBody: true } }, async (req, reply) => {
+  app.post('/api/cards/:id/attachments', auth, async (req, reply) => {
     const { id } = req.params as { id: string }
     const userId = (req.user as { sub: string }).sub
     const data = await req.file()
