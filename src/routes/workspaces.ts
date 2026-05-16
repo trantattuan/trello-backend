@@ -116,6 +116,22 @@ export default async function workspaceRoutes(app: FastifyInstance) {
     return reply.code(204).send()
   })
 
+  app.delete('/workspaces/:id', {
+    ...auth,
+    schema: {
+      tags: ['Workspaces'],
+      summary: 'Delete workspace (Admin only)',
+      params: { type: 'object', properties: { id: { type: 'string' } } },
+    },
+  }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const userId = (req.user as { sub: string }).sub
+    const member = await app.db.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId: id, userId } } })
+    if (!member || member.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin only' })
+    await app.db.workspace.delete({ where: { id } })
+    return reply.code(204).send()
+  })
+
   app.delete('/workspaces/:id/members/:userId', {
     ...auth,
     schema: {
