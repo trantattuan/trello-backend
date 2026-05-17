@@ -90,8 +90,8 @@ export async function evaluateRules(app: FastifyInstance, event: RuleEvent) {
   try {
     const rules = await app.db.rule.findMany({ where: { boardId: event.boardId, isActive: true } })
     for (const rule of rules) {
-      if (!matchesTrigger(rule.trigger as Trigger, event)) continue
-      const actions = rule.actions as Action[]
+      if (!matchesTrigger(rule.trigger as unknown as Trigger, event)) continue
+      const actions = rule.actions as unknown as Action[]
       for (const action of actions) {
         try {
           await executeAction(app, action, event.cardId, event.boardId)
