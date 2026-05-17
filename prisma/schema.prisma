@@ -68,6 +68,7 @@ model Board {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   lists     List[]
   labels    Label[]
+  rules     Rule[]
 
   @@map("boards")
 }
@@ -194,6 +195,34 @@ model Attachment {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("attachments")
+}
+
+model Rule {
+  id        String   @id @default(cuid())
+  boardId   String   @map("board_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  trigger   Json
+  actions   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  logs  RuleLog[]
+
+  @@map("rules")
+}
+
+model RuleLog {
+  id        String   @id @default(cuid())
+  ruleId    String   @map("rule_id")
+  cardId    String?  @map("card_id")
+  status    String
+  detail    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  rule Rule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@map("rule_logs")
 }
 
 model ApiKey {

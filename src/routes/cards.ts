@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import { evaluateRules } from '../services/ruleEngine'
 
 export default async function cardRoutes(app: FastifyInstance) {
   const auth = { onRequest: [app.authenticate] }
@@ -22,6 +23,7 @@ export default async function cardRoutes(app: FastifyInstance) {
     const card = await app.db.card.create({ data: { ...body, position: (last?.position ?? 0) + 1.0 } })
     const list = await app.db.list.findUniqueOrThrow({ where: { id: body.listId } })
     app.io.to(`board:${list.boardId}`).emit('card:created', { ...card, listId: body.listId })
+    evaluateRules(app, { type: 'card_created', cardId: card.id, boardId: list.boardId, listId: body.listId })
     return reply.code(201).send(card)
   })
 
@@ -73,6 +75,7 @@ export default async function cardRoutes(app: FastifyInstance) {
     const card = await app.db.card.update({ where: { id }, data: body })
     const list = await app.db.list.findUniqueOrThrow({ where: { id: body.listId } })
     app.io.to(`board:${list.boardId}`).emit('card:moved', { id, listId: body.listId, position: body.position })
+    evaluateRules(app, { type: 'card_moved', cardId: id, boardId: list.boardId, toListId: body.listId })
     return card
   })
 
@@ -199,7 +202,21 @@ export default async function cardRoutes(app: FastifyInstance) {
   }, async (req) => {
     const { id } = req.params as { id: string }
     const { isDone, text } = z.object({ isDone: z.boolean().optional(), text: z.string().optional() }).parse(req.body)
-    return app.db.checklistItem.update({ where: { id }, data: { isDone, text } })
+    const item = await app.db.checklistItem.update({ where: { id }, data: { isDone, text } })
+    if (isDone === true) {
+      const checklist = await app.db.checklist.findUnique({
+        where: { id: item.checklistId },
+        include: { card: { include: { list: true, checklists: { include: { items: true } } } } },
+      })
+      if (checklist) {
+        const allDone = checklist.card.checklists.length > 0 &&
+          checklist.card.checklists.every((cl) => cl.items.length > 0 && cl.items.every((i) => i.isDone))
+        if (allDone) {
+          evaluateRules(app, { type: 'checklist_completed', cardId: checklist.card.id, boardId: checklist.card.list.boardId })
+        }
+      }
+    }
+    return item
   })
 
   app.delete('/checklists/:id', {

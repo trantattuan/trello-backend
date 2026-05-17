@@ -19,6 +19,7 @@ import cardRoutes from './routes/cards'
 import labelRoutes from './routes/labels'
 import webhookRoutes from './routes/webhooks'
 import searchRoutes from './routes/search'
+import ruleRoutes from './routes/rules'
 
 const app = Fastify({ logger: true })
 
@@ -90,6 +91,7 @@ async function bootstrap() {
   await app.register(labelRoutes)
   await app.register(webhookRoutes)
   await app.register(searchRoutes)
+  await app.register(ruleRoutes)
 
   app.get('/health', async () => ({
     status: 'ok',
