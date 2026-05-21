@@ -209,8 +209,8 @@ export default async function cardRoutes(app: FastifyInstance) {
         include: { card: { include: { list: true, checklists: { include: { items: true } } } } },
       })
       if (checklist) {
-        const allDone = checklist.card.checklists.length > 0 &&
-          checklist.card.checklists.every((cl) => cl.items.length > 0 && cl.items.every((i) => i.isDone))
+        const nonEmpty = checklist.card.checklists.filter((cl) => cl.items.length > 0)
+        const allDone = nonEmpty.length > 0 && nonEmpty.every((cl) => cl.items.every((i) => i.isDone))
         if (allDone) {
           evaluateRules(app, { type: 'checklist_completed', cardId: checklist.card.id, boardId: checklist.card.list.boardId })
         }
