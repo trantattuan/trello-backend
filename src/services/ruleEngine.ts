@@ -73,6 +73,11 @@ async function executeAction(app: FastifyInstance, action: Action, cardId: strin
         update: {},
         create: { cardId, userId: action.userId },
       })
+      const updated = await app.db.card.findUnique({
+        where: { id: cardId },
+        include: { labels: { include: { label: true } }, members: { include: { user: true } } },
+      })
+      if (updated) app.io.to(`board:${boardId}`).emit('card:updated', updated)
       break
     }
     case 'set_due_date': {
