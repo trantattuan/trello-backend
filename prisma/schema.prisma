@@ -65,10 +65,11 @@ model Board {
   visibility    BoardVisibility @default(WORKSPACE)
   createdAt     DateTime        @default(now()) @map("created_at")
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  lists     List[]
-  labels    Label[]
-  rules     Rule[]
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lists         List[]
+  labels        Label[]
+  rules         Rule[]
+  scheduledJobs ScheduledJob[]
 
   @@map("boards")
 }
@@ -223,6 +224,22 @@ model RuleLog {
   rule Rule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@map("rule_logs")
+}
+
+model ScheduledJob {
+  id             String    @id @default(cuid())
+  boardId        String    @map("board_id")
+  listId         String    @map("list_id")
+  title          String
+  scheduledAt    DateTime? @map("scheduled_at")
+  cronExpression String?   @map("cron_expression")
+  isActive       Boolean   @default(true) @map("is_active")
+  lastRunAt      DateTime? @map("last_run_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("scheduled_jobs")
 }
 
 model ApiKey {
