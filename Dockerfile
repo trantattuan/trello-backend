@@ -18,6 +18,11 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 RUN chown -R app:app /app
+RUN apk add --no-cache postgresql16-client rclone tar gzip curl && \
+    curl -sSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc && \
+    chmod +x /usr/local/bin/mc && \
+    mkdir -p /home/app/.config/rclone /tmp/backups && \
+    chown -R app:app /home/app/.config /tmp/backups
 USER app
 
 EXPOSE 3001

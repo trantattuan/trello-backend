@@ -21,6 +21,8 @@ import webhookRoutes from './routes/webhooks'
 import searchRoutes from './routes/search'
 import ruleRoutes from './routes/rules'
 import scheduleRoutes from './routes/schedules'
+import backupRoutes from './routes/backup'
+import { startBackupScheduler } from './services/backup'
 
 const app = Fastify({ logger: true })
 
@@ -94,6 +96,10 @@ async function bootstrap() {
   await app.register(searchRoutes)
   await app.register(ruleRoutes)
   await app.register(scheduleRoutes)
+  await app.register(backupRoutes)
+
+  const stopScheduler = startBackupScheduler(app.db)
+  app.addHook('onClose', async () => stopScheduler())
 
   app.get('/health', async () => ({
     status: 'ok',

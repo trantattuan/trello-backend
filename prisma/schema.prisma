@@ -255,3 +255,37 @@ model ApiKey {
 
   @@map("api_keys")
 }
+
+model BackupSettings {
+  id                 String   @id @default("global")
+  enabled            Boolean  @default(false)
+  cronExpr           String   @default("0 2 * * *") @map("cron_expr")
+  retentionCount     Int      @default(30) @map("retention_count")
+  scopeDb            Boolean  @default(true) @map("scope_db")
+  scopeUploads       Boolean  @default(true) @map("scope_uploads")
+  rcloneRemote       String   @default("gdrive") @map("rclone_remote")
+  remoteFolder       String   @default("app-backups") @map("remote_folder")
+  gdriveClientId     String   @default("") @map("gdrive_client_id")
+  gdriveClientSecret String   @default("") @map("gdrive_client_secret")
+  gdriveAccountEmail String   @default("") @map("gdrive_account_email")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("backup_settings")
+}
+
+model BackupRun {
+  id           String    @id @default(cuid())
+  kind         String
+  status       String
+  scopeDb      Boolean   @default(false) @map("scope_db")
+  scopeUploads Boolean   @default(false) @map("scope_uploads")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  sizeBytes    BigInt    @default(0) @map("size_bytes")
+  remotePath   String    @default("") @map("remote_path")
+  error        String    @default("")
+  logTail      String    @default("") @map("log_tail")
+  triggeredBy  String?   @map("triggered_by")
+
+  @@map("backup_runs")
+}
